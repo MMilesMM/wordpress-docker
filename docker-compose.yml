@@ -19,8 +19,7 @@ services:
   wordpress:
     depends_on:
       - db
-    build: .
-    image: wordpress:latest
+    image: mmilesmm/wordpress-apache-php-fix:2.0
     container_name: wordpress
     restart: unless-stopped
     env_file: .env
