@@ -1,0 +1,46 @@
+version: '3.9'
+services:
+  db:
+    image: mysql:8.4
+    container_name: db
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      - MYSQL_ROOT_PASSWORD=$MYSQL_ROOT_PASSWORD
+      - MYSQL_DATABASE=wordpress
+      - MYSQL_USER=$MYSQL_USER
+      - MYSQL_PASSWORD=$MYSQL_PASSWORD
+    volumes:
+      - dbdata:/var/lib/mysql
+    command: ["mysqld", "--mysql-native-password=ON"]
+    networks:
+      - app-network
+
+  wordpress:
+    depends_on:
+      - db
+    build: .
+    image: wordpress:latest
+    container_name: wordpress
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      - WORDPRESS_DB_HOST=db:3306
+      - WORDPRESS_DB_USER=$MYSQL_USER
+      - WORDPRESS_DB_PASSWORD=$MYSQL_PASSWORD
+      - WORDPRESS_DB_NAME=wordpress
+    volumes:
+      - wordpress_data:/var/www/html
+      - ./wordpress.ini:/usr/local/etc/php/conf.d/wordpress.ini
+    ports:
+      - "3000:80"
+    networks:
+      - app-network
+
+volumes:
+  dbdata:
+  wordpress_data:
+
+networks:
+  app-network:
+    driver: bridge
