@@ -26,4 +26,4 @@ services:
       - ./wordpress_data:/var/www/html
       - ./wordpress.ini:/usr/local/etc/php/conf.d/wordpress.ini
     ports:
-      - "{{ WEB_PORT }}:80"
+      - "{{ WEB_PORT }}":80
