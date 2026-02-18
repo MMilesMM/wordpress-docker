@@ -18,7 +18,6 @@ services:
     image: mmilesmm/wordpress-apache-php-fix:latest
     container_name: wordpress
     restart: unless-stopped
-    env_file: .env
     environment:
       - WORDPRESS_DB_HOST=db:3306
       - WORDPRESS_DB_USER=$MYSQL_USER
