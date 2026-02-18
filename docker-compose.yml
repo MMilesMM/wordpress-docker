@@ -1,0 +1,31 @@
+services:
+  db:
+    image: mariadb:12.1
+    restart: unless-stopped
+    environment:
+      TZ: Europe/Berlin
+      MARIADB_ROOT_PASSWORD: $MARIADB_ROOT_PASSWORD
+      MYSQL_USER: $MYSQL_USER
+      MYSQL_PASSWORD: $MYSQL_PASSWORD
+      MYSQL_DATABASE: wordpress
+      MARIADB_AUTO_UPGRADE: 1
+    volumes:
+      - ./db:/var/lib/mysql
+
+  wordpress:
+    depends_on:
+      - db
+    build: .
+    image: mmilesmm/wordpress-apache-php-fix:lates
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      - WORDPRESS_DB_HOST=db:3306
+      - WORDPRESS_DB_USER=$MYSQL_USER
+      - WORDPRESS_DB_PASSWORD=$MYSQL_PASSWORD
+      - WORDPRESS_DB_NAME=wordpress
+    volumes:
+      - ./wordpress_data:/var/www/html
+      - ./wordpress.ini:/usr/local/etc/php/conf.d/wordpress.ini
+    ports:
+      - "127.0.0.1:${WEB_PORT:-3000}:80"
