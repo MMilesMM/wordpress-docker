@@ -16,7 +16,6 @@ services:
     depends_on:
       - db
     image: mmilesmm/wordpress-apache-php-fix:latest
-    container_name: wordpress
     restart: unless-stopped
     environment:
       - WORDPRESS_DB_HOST=db:3306
