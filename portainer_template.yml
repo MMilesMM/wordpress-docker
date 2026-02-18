@@ -4,11 +4,11 @@ services:
     restart: unless-stopped
     environment:
       TZ: Europe/Berlin
-      MARIADB_ROOT_PASSWORD: {{ MARIADB_ROOT_PASSWORD }}
-      MYSQL_USER: {{ MYSQL_USER }}
-      MYSQL_PASSWORD: {{ MYSQL_PASSWORD }}
+      MARIADB_ROOT_PASSWORD: "{{ MARIADB_ROOT_PASSWORD }}"
+      MYSQL_USER: "{{ MYSQL_USER }}"
+      MYSQL_PASSWORD: "{{ MYSQL_PASSWORD }}"
       MYSQL_DATABASE: wordpress
-      MARIADB_AUTO_UPGRADE: 1
+      MARIADB_AUTO_UPGRADE: "1"
     volumes:
       - ./db:/var/lib/mysql
 
@@ -19,8 +19,8 @@ services:
     restart: unless-stopped
     environment:
       WORDPRESS_DB_HOST: db:3306
-      WORDPRESS_DB_USER: {{ MYSQL_USER }}
-      WORDPRESS_DB_PASSWORD: {{ MYSQL_PASSWORD }}
+      WORDPRESS_DB_USER: "{{ MYSQL_USER }}"
+      WORDPRESS_DB_PASSWORD: "{{ MYSQL_PASSWORD }}"
       WORDPRESS_DB_NAME: wordpress
     volumes:
       - ./wordpress_data:/var/www/html
