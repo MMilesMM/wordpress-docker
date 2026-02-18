@@ -11,7 +11,6 @@ services:
       MARIADB_AUTO_UPGRADE: 1
     volumes:
       - ./db:/var/lib/mysql
-    command: ["mysqld", "--mysql-native-password=ON"]
 
   wordpress:
     depends_on:
