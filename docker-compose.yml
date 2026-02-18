@@ -1,25 +1,22 @@
-version: '3.9'
 services:
   db:
-    image: mysql:8.4
-    container_name: db
+    image: mariadb:12.1
     restart: unless-stopped
-    env_file: .env
     environment:
-      - MYSQL_ROOT_PASSWORD=$MYSQL_ROOT_PASSWORD
-      - MYSQL_DATABASE=wordpress
-      - MYSQL_USER=$MYSQL_USER
-      - MYSQL_PASSWORD=$MYSQL_PASSWORD
+      TZ: Europe/Berlin
+      MARIADB_ROOT_PASSWORD: $MARIADB_ROOT_PASSWORD
+      MYSQL_USER: $MYSQL_USER
+      MYSQL_PASSWORD: $MYSQL_PASSWORD
+      MYSQL_DATABASE: wordpress
+      MARIADB_AUTO_UPGRADE: 1
     volumes:
-      - dbdata:/var/lib/mysql
+      - ./db:/var/lib/mysql
     command: ["mysqld", "--mysql-native-password=ON"]
-    networks:
-      - app-network
 
   wordpress:
     depends_on:
       - db
-    image: mmilesmm/wordpress-apache-php-fix:2.0
+    image: mmilesmm/wordpress-apache-php-fix:latest
     container_name: wordpress
     restart: unless-stopped
     env_file: .env
@@ -29,17 +26,7 @@ services:
       - WORDPRESS_DB_PASSWORD=$MYSQL_PASSWORD
       - WORDPRESS_DB_NAME=wordpress
     volumes:
-      - wordpress_data:/var/www/html
+      - ./wordpress_data:/var/www/html
       - ./wordpress.ini:/usr/local/etc/php/conf.d/wordpress.ini
     ports:
-      - "3000:80"
-    networks:
-      - app-network
-
-volumes:
-  dbdata:
-  wordpress_data:
-
-networks:
-  app-network:
-    driver: bridge
+      - "127.0.0.1:${WEB_PORT:-3000}:80"
