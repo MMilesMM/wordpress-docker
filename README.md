@@ -1,6 +1,6 @@
 # Custom Wordpress Docker Compose
 
-## Wyh?
+## Why?
 I needed a docker image which has a couple more php modules enabled than the https://hub.docker.com/_/wordpress Image
 ## How to use? 
 You can use this `docker-compose.yml` file and edit it to your liking
@@ -47,7 +47,7 @@ MYSQL_PASSWORD=supersecretandlongpasswordyoushouldchange
 WEB_PORT=[port]
 ```
 
-Also, please adjust the `wordpress.ini` to your liking as well, this is my default (I know they are not optimal but it works and I can´t be bothered but if you have suggestions feel free to open an issue):
+Also, please adjust the `wordpress.ini` to your liking as well, this is my default (I know these values are not optimal but it works and I can´t be bothered but if you have suggestions feel free to open an issue):
 
 ```ini
 file_uploads = On
