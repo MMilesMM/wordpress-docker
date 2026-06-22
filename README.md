@@ -20,9 +20,29 @@ services:
       MARIADB_AUTO_UPGRADE: 1
     volumes:
       - ./db:/var/lib/mysql
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - ./redis:/data
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
   wordpress:
     depends_on:
       - db
+      - redis
+    build: .
     image: mmilesmm/wordpress-apache-php-fix:latest
     restart: unless-stopped
     env_file: .env
@@ -36,6 +56,11 @@ services:
       - ./wordpress.ini:/usr/local/etc/php/conf.d/wordpress.ini
     ports:
       - "127.0.0.1:${WEB_PORT:-3000}:80"
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
 ```
 
 Basic `.env` file:
