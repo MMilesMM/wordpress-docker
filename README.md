@@ -12,8 +12,6 @@ A WordPress image with a few more PHP modules than the [official image](https://
 
 Image: [`mmilesmm/wordpress-apache-php-fix`](https://hub.docker.com/r/mmilesmm/wordpress-apache-php-fix)
 
-Hosting many sites on one server? See [wordpress-infrastructure-docker](https://github.com/MMilesMM/wordpress-infrastructure-docker) (shared MariaDB/Redis, management scripts).
-
 ## What's in the image
 
 Based on the pinned official `wordpress:7.1-php8.3-apache`, plus:
