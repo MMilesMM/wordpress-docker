@@ -1,0 +1,23 @@
+name: Lint
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  compose:
+    runs-on: docker
+    steps:
+      - uses: https://data.forgejo.org/actions/checkout@v4
+
+      - name: Install docker compose
+        run: |
+          curl -fsSL -o /usr/local/bin/docker-compose \
+            https://github.com/docker/compose/releases/latest/download/docker-compose-linux-x86_64
+          chmod +x /usr/local/bin/docker-compose
+
+      - name: Validate docker-compose.yml
+        run: |
+          printf 'MARIADB_ROOT_PASSWORD=x\nMYSQL_USER=wordpress\nMYSQL_PASSWORD=x\nREDIS_PASSWORD=x\n' > .env
+          docker-compose config -q
+          echo "docker-compose.yml OK"

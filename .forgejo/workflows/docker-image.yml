@@ -1,0 +1,88 @@
+# Builds the WordPress image on the Forgejo runner and pushes it to Docker Hub.
+#
+# The runner starts jobs unprivileged (no Docker socket, no docker-in-docker),
+# so the image is built with kaniko, which needs neither. The build context is
+# fetched by kaniko itself straight from this repository.
+#
+# Required repository secrets (Settings -> Actions -> Secrets):
+#   DOCKERHUB_USERNAME  Docker Hub user, e.g. mmilesmm
+#   DOCKERHUB_TOKEN     Docker Hub personal access token (Read & Write)
+#
+# Tags pushed:
+#   push to main / weekly / manual:  latest, sha-<short>
+#   git tag v5.4.0:                  5.4.0, 5.4, latest
+
+name: Docker image
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - Dockerfile
+      - .forgejo/workflows/docker-image.yml
+    tags: ["v*"]
+  schedule:
+    - cron: "23 4 * * 1" # weekly rebuild for base image security updates
+  workflow_dispatch:
+
+env:
+  IMAGE: docker.io/mmilesmm/wordpress-apache-php-fix
+
+jobs:
+  build-push:
+    runs-on: docker
+    container:
+      image: martizih/kaniko:v1.28.6-debug # maintained kaniko fork, debug = has a shell
+    steps:
+      - name: Build and push
+        shell: sh
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+          GIT_USERNAME: ${{ github.actor }}
+          GIT_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
+          REF: ${{ github.ref }}
+          SHA: ${{ github.sha }}
+          SERVER_URL: ${{ github.server_url }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set -eu
+
+          if [ -z "${DOCKERHUB_USERNAME}" ] || [ -z "${DOCKERHUB_TOKEN}" ]; then
+            echo "DOCKERHUB_USERNAME / DOCKERHUB_TOKEN secrets are not set." >&2
+            exit 1
+          fi
+
+          # Registry login for kaniko
+          auth="$(printf '%s:%s' "$DOCKERHUB_USERNAME" "$DOCKERHUB_TOKEN" | base64 | tr -d '\n')"
+          mkdir -p /kaniko/.docker
+          printf '{"auths":{"https://index.docker.io/v1/":{"auth":"%s"}}}' "$auth" > /kaniko/.docker/config.json
+
+          # Tags
+          short="$(echo "$SHA" | cut -c1-7)"
+          case "$REF" in
+            refs/tags/v*)
+              version="${REF#refs/tags/v}"
+              minor="$(echo "$version" | cut -d. -f1-2)"
+              tags="$version $minor latest"
+              ;;
+            *)
+              tags="latest sha-$short"
+              ;;
+          esac
+
+          destinations=""
+          for t in $tags; do
+            destinations="$destinations --destination=${IMAGE}:${t}"
+          done
+          echo "Pushing: $tags"
+
+          host="$(echo "$SERVER_URL" | sed 's#^https\{0,1\}://##')"
+          # shellcheck disable=SC2086
+          /kaniko/executor \
+            --context "git://${host}/${REPOSITORY}.git#${REF}#${SHA}" \
+            --dockerfile Dockerfile \
+            --label "org.opencontainers.image.revision=${SHA}" \
+            --label "org.opencontainers.image.source=${SERVER_URL}/${REPOSITORY}" \
+            --cleanup \
+            $destinations

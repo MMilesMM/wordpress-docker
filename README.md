@@ -1,95 +1,115 @@
-# Custom Wordpress Docker Compose
+# WordPress Docker (single site)
 
-## Why?
-I needed a docker image which has a couple more php modules enabled than the https://hub.docker.com/_/wordpress Image
-## How to use? 
-You can use this `docker-compose.yml` file and edit it to your liking
-Dont forget the .env file!
+> **Where this repository lives:** the main repository is on my own Forgejo at
+> [git.mqit.de/mmilesmm/wordpress-docker](https://git.mqit.de/mmilesmm/wordpress-docker).
+> Development, CI and the Docker Hub builds happen there, and every change is mirrored
+> automatically to [GitHub](https://github.com/MMilesMM/wordpress-docker), so you will
+> always find the complete code on both. The GitHub copy is overwritten by the mirror,
+> so changes are not merged there directly: issues and pull requests on GitHub are
+> welcome, and I apply accepted changes in the main repository.
 
-```YAML
-services:
-  db:
-    image: mariadb:12.1
-    restart: unless-stopped
-    environment:
-      TZ: Europe/Berlin
-      MARIADB_ROOT_PASSWORD: $MARIADB_ROOT_PASSWORD
-      MYSQL_USER: $MYSQL_USER
-      MYSQL_PASSWORD: $MYSQL_PASSWORD
-      MYSQL_DATABASE: wordpress
-      MARIADB_AUTO_UPGRADE: 1
-    volumes:
-      - ./db:/var/lib/mysql
-    logging:
-      driver: json-file
-      options:
-        max-size: "50m"
-        max-file: "5"
+A WordPress image with a few more PHP modules than the [official image](https://hub.docker.com/_/wordpress), plus a ready-to-use Docker Compose setup for **one** WordPress site with its own MariaDB and Redis.
 
-  redis:
-    image: redis:7-alpine
-    restart: unless-stopped
-    command: ["redis-server", "--appendonly", "yes"]
-    volumes:
-      - ./redis:/data
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "3"
+Image: [`mmilesmm/wordpress-apache-php-fix`](https://hub.docker.com/r/mmilesmm/wordpress-apache-php-fix)
 
-  wordpress:
-    depends_on:
-      - db
-      - redis
-    build: .
-    image: mmilesmm/wordpress-apache-php-fix:latest
-    restart: unless-stopped
-    env_file: .env
-    environment:
-      - WORDPRESS_DB_HOST=db:3306
-      - WORDPRESS_DB_USER=$MYSQL_USER
-      - WORDPRESS_DB_PASSWORD=$MYSQL_PASSWORD
-      - WORDPRESS_DB_NAME=wordpress
-    volumes:
-      - ./wordpress_data:/var/www/html
-      - ./wordpress.ini:/usr/local/etc/php/conf.d/wordpress.ini
-    ports:
-      - "127.0.0.1:${WEB_PORT:-3000}:80"
-    logging:
-      driver: json-file
-      options:
-        max-size: "50m"
-        max-file: "5"
+Hosting many sites on one server? See [wordpress-infrastructure-docker](https://github.com/MMilesMM/wordpress-infrastructure-docker) (shared MariaDB/Redis, management scripts).
+
+## What's in the image
+
+Based on the pinned official `wordpress:7.1-php8.3-apache`, plus:
+
+- Apache modules: `headers`, `ext_filter`
+- PHP extensions: `tidy`, `soap`, `redis`, `brotli`
+
+## Quick start
+
+```bash
+mkdir wordpress && cd wordpress
+for f in docker-compose.yml wordpress.ini env.example; do
+  curl -fsSLO https://raw.githubusercontent.com/MMilesMM/wordpress-docker/main/$f
+done
+
+cp env.example .env
+# fill in the passwords, e.g. with: openssl rand -hex 24
+nano .env
+
+docker compose up -d
 ```
 
-Basic `.env` file:
+WordPress listens on `127.0.0.1:${WEB_PORT}` (default 3000). Put a reverse proxy with TLS in front of it, e.g. Caddy:
 
+```caddy
+example.com {
+    encode zstd gzip
+    reverse_proxy 127.0.0.1:3000
+}
 ```
-MARIADB_ROOT_PASSWORD=securepasswordwhichshouldnotbetherootpassword
-MYSQL_USER=wordpress
-MYSQL_PASSWORD=supersecretandlongpasswordyoushouldchange
-WEB_PORT=[port]
+
+HTTPS (`X-Forwarded-Proto`) and the client IP (`X-Forwarded-For`) from the proxy are detected automatically.
+
+## `.env`
+
+| Variable | Required | Purpose |
+| --- | --- | --- |
+| `MARIADB_ROOT_PASSWORD` | yes | MariaDB root password (stays in the `db` container) |
+| `MYSQL_USER` / `MYSQL_PASSWORD` | yes | database user for WordPress |
+| `REDIS_PASSWORD` | yes | Redis password, also passed to WordPress |
+| `WEB_PORT` | no (3000) | localhost port |
+| `WORDPRESS_IMAGE` | no | defaults to `mmilesmm/wordpress-apache-php-fix:5.3.0` |
+| `MARIADB_VERSION` / `REDIS_VERSION` | no | default `12.3` / `7.4-alpine` |
+| `REDIS_MAXMEMORY` | no (128mb) | Redis memory limit |
+| `TZ` | no | default `Europe/Berlin` |
+
+## Redis object cache
+
+Redis is ready to use. Install and enable the [Redis Object Cache](https://wordpress.org/plugins/redis-cache/) plugin in WordPress, the connection settings (`WP_REDIS_HOST`, `WP_REDIS_PASSWORD`) are already defined. Redis runs as a pure cache: password protected, limited memory with LRU eviction, no persistence.
+
+## PHP settings
+
+`wordpress.ini` is mounted read-only into the container. Defaults: 512M memory, 2048M uploads, 300 s execution time, opcache enabled. Adjust it and run `docker compose restart wordpress`.
+
+## Security
+
+- The MariaDB root password is only given to the `db` container, not to WordPress, and root can only log in from inside that container.
+- MariaDB and Redis are not published on the host; WordPress is bound to `127.0.0.1`.
+- `DISALLOW_FILE_EDIT` disables the theme/plugin editor in the dashboard.
+- `.env`, `db/`, `redis/` and `wordpress_data/` are ignored by Git.
+
+## Backup
+
+```bash
+docker compose exec -T db sh -c 'mariadb-dump -uroot -p"$MARIADB_ROOT_PASSWORD" --single-transaction --databases wordpress' | gzip > wordpress-$(date +%F).sql.gz
+tar -czf wordpress_data-$(date +%F).tar.gz wordpress_data
 ```
 
-Also, please adjust the `wordpress.ini` to your liking as well, this is my default (I know these values are not optimal but it works and I can´t be bothered but if you have suggestions feel free to open an issue):
+## Upgrading from an older version of this compose file
 
-```ini
-file_uploads = On
+- Add `REDIS_PASSWORD` to your `.env` (it is now required).
+- The WordPress container no longer reads the whole `.env`; only the variables above are used.
+- MariaDB moves from 12.1 to 12.3 LTS automatically (`MARIADB_AUTO_UPGRADE`).
+- `MARIADB_ROOT_HOST=localhost` only applies to new databases. To remove network access for root on an existing one:
+  ```bash
+  docker compose exec db sh -c 'mariadb -uroot -p"$MARIADB_ROOT_PASSWORD" -e "DROP USER IF EXISTS root@\"%\""'
+  ```
+  (check first that `root@localhost` exists: `SELECT User,Host FROM mysql.user;`)
+- The image is pinned to a version tag instead of `latest`.
 
-memory_limit = 512M
+## Building the image yourself
 
-upload_max_filesize = 2048M
-post_max_size = 3096M
-
-max_execution_time = 300
-max_input_time = 1000
-
-max_input_vars = 5000
-
-opcache.enable = 1
-opcache.memory_consumption = 256
-opcache.interned_strings_buffer = 16
-opcache.max_accelerated_files = 20000
-opcache.revalidate_freq = 60
+```bash
+docker build -t mmilesmm/wordpress-apache-php-fix:dev .
+# other base: --build-arg WORDPRESS_TAG=7.1-php8.4-apache
 ```
+
+## CI
+
+The image is built on the Forgejo runner of the main repository (see above) with kaniko and pushed to Docker Hub. The workflows are in `.forgejo/workflows/`; `.github/workflows/` only runs a test build on GitHub.
+
+| Trigger | Tags |
+| --- | --- |
+| push to `main` changing the Dockerfile, weekly (Mon 04:23), manual | `latest`, `sha-<short>` |
+| git tag `v5.4.0` | `5.4.0`, `5.4`, `latest` |
+
+## License
+
+GPL-3.0
