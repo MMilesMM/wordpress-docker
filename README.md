@@ -57,6 +57,7 @@ HTTPS (`X-Forwarded-Proto`) and the client IP (`X-Forwarded-For`) from the proxy
 | `MARIADB_VERSION` / `REDIS_VERSION` | no | default `12.3` / `7.4-alpine` |
 | `REDIS_MAXMEMORY` | no (128mb) | Redis memory limit |
 | `TZ` | no | default `Europe/Berlin` |
+| `DOCKER_MTU` | no (1500) | MTU of the Docker network, see below |
 
 ## Redis object cache
 
@@ -65,6 +66,17 @@ Redis is ready to use. Install and enable the [Redis Object Cache](https://wordp
 ## PHP settings
 
 `wordpress.ini` is mounted read-only into the container. Defaults: 512M memory, 2048M uploads, 300 s execution time, opcache enabled. Adjust it and run `docker compose restart wordpress`.
+
+## Slow admin / timeouts to external servers (MTU)
+
+If the host's network MTU is smaller than 1500 (common on OpenStack clouds: 1450), large packets from the containers get dropped. TCP connects, but the TLS handshake hangs, so WordPress runs into `cURL error 28: Connection timed out` for update checks and license servers, and the admin becomes very slow. The frontend stays fast, especially with a page cache.
+
+Check the host MTU with `ip link`. If it is below 1500, set it in `.env` and recreate the network:
+
+```bash
+echo DOCKER_MTU=1450 >> .env
+docker compose down && docker compose up -d
+```
 
 ## Security
 

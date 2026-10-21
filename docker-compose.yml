@@ -108,3 +108,10 @@ services:
       options:
         max-size: "50m"
         max-file: "5"
+
+networks:
+  default:
+    driver_opts:
+      # Must not be larger than the host's MTU. Clouds like OpenStack often use
+      # 1450; with the default 1500, TLS connections from the containers hang.
+      com.docker.network.driver.mtu: ${DOCKER_MTU:-1500}
