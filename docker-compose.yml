@@ -62,7 +62,7 @@ services:
         max-file: "3"
 
   wordpress:
-    image: ${WORDPRESS_IMAGE:-mmilesmm/wordpress-apache-php-fix:5.3.0}
+    image: ${WORDPRESS_IMAGE:-mmilesmm/wordpress-apache-php-fix:5.4.0}
     restart: unless-stopped
     depends_on:
       db:

@@ -1,6 +1,6 @@
 # WordPress (Apache) with a few extra PHP extensions and Apache modules.
 # Pin the base so builds are reproducible; bump deliberately.
-ARG WORDPRESS_TAG=7.1-php8.3-apache
+ARG WORDPRESS_TAG=7.1-php8.5-apache
 FROM wordpress:${WORDPRESS_TAG}
 
 # Builds the extensions and removes their build dependencies afterwards,

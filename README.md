@@ -14,7 +14,7 @@ Image: [`mmilesmm/wordpress-apache-php-fix`](https://hub.docker.com/r/mmilesmm/w
 
 ## What's in the image
 
-Based on the pinned official `wordpress:7.1-php8.3-apache`, plus:
+Based on the pinned official `wordpress:7.1-php8.5-apache`, plus:
 
 - Apache modules: `headers`, `ext_filter`
 - PHP extensions: `tidy`, `soap`, `redis`, `brotli`
@@ -53,7 +53,7 @@ HTTPS (`X-Forwarded-Proto`) and the client IP (`X-Forwarded-For`) from the proxy
 | `MYSQL_USER` / `MYSQL_PASSWORD` | yes | database user for WordPress |
 | `REDIS_PASSWORD` | yes | Redis password, also passed to WordPress |
 | `WEB_PORT` | no (3000) | localhost port |
-| `WORDPRESS_IMAGE` | no | defaults to `mmilesmm/wordpress-apache-php-fix:5.3.0` |
+| `WORDPRESS_IMAGE` | no | defaults to `mmilesmm/wordpress-apache-php-fix:5.4.0` |
 | `MARIADB_VERSION` / `REDIS_VERSION` | no | default `12.3` / `7.4-alpine` |
 | `REDIS_MAXMEMORY` | no (128mb) | Redis memory limit |
 | `TZ` | no | default `Europe/Berlin` |
