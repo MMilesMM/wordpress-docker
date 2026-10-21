@@ -87,6 +87,14 @@ services:
         }
         define('DISALLOW_FILE_EDIT', true);
 
+        // Automatic updates for all plugins and themes (WP_AUTO_UPDATE_EXTENSIONS).
+        // wp-config runs before the plugin API is loaded, so the filters are
+        // pre-registered via $$wp_filter (supported by WordPress since 4.7).
+        if (${WP_AUTO_UPDATE_EXTENSIONS:-false}) {
+          $$GLOBALS['wp_filter']['auto_update_plugin'][10][] = ['function' => '__return_true', 'accepted_args' => 1];
+          $$GLOBALS['wp_filter']['auto_update_theme'][10][] = ['function' => '__return_true', 'accepted_args' => 1];
+        }
+
         // Redis Object Cache plugin
         define('WP_REDIS_HOST', 'redis');
         define('WP_REDIS_PORT', 6379);

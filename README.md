@@ -57,6 +57,7 @@ HTTPS (`X-Forwarded-Proto`) and the client IP (`X-Forwarded-For`) from the proxy
 | `MARIADB_VERSION` / `REDIS_VERSION` | no | default `12.3` / `7.4-alpine` |
 | `REDIS_MAXMEMORY` | no (128mb) | Redis memory limit |
 | `TZ` | no | default `Europe/Berlin` |
+| `WP_AUTO_UPDATE_EXTENSIONS` | no (false) | `true` = automatic updates for all plugins and themes |
 | `DOCKER_MTU` | no (1500) | MTU of the Docker network, see below |
 
 ## Redis object cache
