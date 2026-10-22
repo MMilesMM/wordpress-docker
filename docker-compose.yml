@@ -76,26 +76,24 @@ services:
       WORDPRESS_DB_NAME: wordpress
       WORDPRESS_DB_USER: ${MYSQL_USER}
       WORDPRESS_DB_PASSWORD: ${MYSQL_PASSWORD}
+      # Space-separated IPs/CIDRs allowed to set X-Forwarded-*. The default keeps
+      # the official image's behaviour (all private networks), fine while the port
+      # is bound to 127.0.0.1. Set it when BIND_ADDRESS is reachable from the LAN.
+      APACHE_TRUSTED_PROXIES: ${WP_TRUSTED_PROXIES:-127.0.0.0/8 10.0.0.0/8 172.16.0.0/12 192.168.0.0/16 169.254.0.0/16}
       WORDPRESS_CONFIG_EXTRA: |
-        // Behind a reverse proxy. Headers are trusted from everyone by default,
-        // which is safe while the port is bound to 127.0.0.1 (BIND_ADDRESS).
-        // If the port is reachable from the network, set WP_TRUSTED_PROXIES to
-        // the proxy's IP(s) so nobody else can fake HTTPS or the client IP.
-        $$_wp_trusted = array_filter(array_map('trim', explode(',', '${WP_TRUSTED_PROXIES:-}')));
-        if (!$$_wp_trusted || in_array($$_SERVER['REMOTE_ADDR'] ?? '', $$_wp_trusted, true)) {
+        // Reverse proxy: Apache (configs.apache-remoteip) accepts X-Forwarded-For
+        // only from WP_TRUSTED_PROXIES and then sets REMOTE_ADDR to the client IP.
+        // X-Peer-Addr is the real TCP peer, always set by Apache (not spoofable).
+        // If both differ, the request came through a trusted proxy and only then
+        // X-Forwarded-Proto is honoured. Otherwise undo the official image's
+        // unconditional HTTPS detection (the container itself speaks plain HTTP).
+        $$_wp_peer = $$_SERVER['HTTP_X_PEER_ADDR'] ?? '';
+        if ($$_wp_peer !== '' && $$_wp_peer !== ($$_SERVER['REMOTE_ADDR'] ?? '')) {
           if (($$_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https') {
             $$_SERVER['HTTPS'] = 'on';
           }
-          if (!empty($$_SERVER['HTTP_X_FORWARDED_FOR'])) {
-            // The last entry is the one appended by our own proxy.
-            $$_wp_xff = array_map('trim', explode(',', $$_SERVER['HTTP_X_FORWARDED_FOR']));
-            $$_SERVER['REMOTE_ADDR'] = end($$_wp_xff);
-          }
         } else {
-          // Not from a trusted proxy: undo what the official image's wp-config
-          // already derived from X-Forwarded-Proto (the container itself only
-          // speaks plain HTTP, so HTTPS can never be legitimately on here).
-          unset($$_SERVER['HTTPS'], $$_SERVER['HTTP_X_FORWARDED_PROTO'], $$_SERVER['HTTP_X_FORWARDED_FOR']);
+          unset($$_SERVER['HTTPS'], $$_SERVER['HTTP_X_FORWARDED_PROTO']);
         }
         define('DISALLOW_FILE_EDIT', true);
 
@@ -114,6 +112,9 @@ services:
     volumes:
       - ./wordpress_data:/var/www/html
       - ./wordpress.ini:/usr/local/etc/php/conf.d/wordpress.ini:ro
+    configs:
+      - source: apache-remoteip
+        target: /etc/apache2/conf-available/remoteip.conf
     ports:
       # 127.0.0.1 = only a reverse proxy on this host can reach the site (default)
       - "${BIND_ADDRESS:-127.0.0.1}:${WEB_PORT:-3000}:80"
@@ -136,3 +137,13 @@ networks:
       # Must not be larger than the host's MTU. Clouds like OpenStack often use
       # 1450; with the default 1500, TLS connections from the containers hang.
       com.docker.network.driver.mtu: ${DOCKER_MTU:-1500}
+
+configs:
+  # Replaces the official image's remoteip.conf. The proxy list comes from the
+  # APACHE_TRUSTED_PROXIES env var (= WP_TRUSTED_PROXIES), so changing it
+  # recreates the container; compose does not notice changed config content.
+  apache-remoteip:
+    content: |
+      RemoteIPHeader X-Forwarded-For
+      RemoteIPInternalProxy $${APACHE_TRUSTED_PROXIES}
+      RequestHeader set X-Peer-Addr "expr=%{CONN_REMOTE_ADDR}"
