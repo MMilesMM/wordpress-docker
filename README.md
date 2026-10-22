@@ -34,7 +34,7 @@ nano .env
 docker compose up -d
 ```
 
-WordPress listens on `127.0.0.1:${WEB_PORT}` (default 3000). Put a reverse proxy with TLS in front of it, e.g. Caddy:
+WordPress listens on `127.0.0.1:${WEB_PORT}` (default 3000, see [Reverse proxy on another server](#reverse-proxy-on-another-server)). Put a reverse proxy with TLS in front of it, e.g. Caddy:
 
 ```caddy
 example.com {
@@ -57,6 +57,8 @@ HTTPS (`X-Forwarded-Proto`) and the client IP (`X-Forwarded-For`) from the proxy
 | `MARIADB_VERSION` / `REDIS_VERSION` | no | default `12.3` / `7.4-alpine` |
 | `REDIS_MAXMEMORY` | no (128mb) | Redis memory limit |
 | `TZ` | no | default `Europe/Berlin` |
+| `BIND_ADDRESS` | no (127.0.0.1) | address the WordPress port is published on |
+| `WP_TRUSTED_PROXIES` | no | proxy IP(s) allowed to set `X-Forwarded-*`; required if `BIND_ADDRESS` is not 127.0.0.1 |
 | `WP_AUTO_UPDATE_EXTENSIONS` | no (false) | `true` = automatic updates for all plugins and themes |
 | `DOCKER_MTU` | no (1500) | MTU of the Docker network, see below |
 
@@ -67,6 +69,19 @@ Redis is ready to use. Install and enable the [Redis Object Cache](https://wordp
 ## PHP settings
 
 `wordpress.ini` is mounted read-only into the container. Defaults: 512M memory, 2048M uploads, 300 s execution time, opcache enabled. Adjust it and run `docker compose restart wordpress`.
+
+## Reverse proxy on another server
+
+By default the WordPress port is bound to `127.0.0.1`, so only a proxy on the same host can reach it. If the proxy (e.g. Nginx Proxy Manager) runs on another server, set in `.env`:
+
+```
+BIND_ADDRESS=10.0.0.10          # private IP of this host (avoid 0.0.0.0 on a public interface)
+WP_TRUSTED_PROXIES=10.0.0.5     # IP(s) of the proxy, comma-separated
+```
+
+`WP_TRUSTED_PROXIES` matters: without it WordPress trusts `X-Forwarded-Proto` and `X-Forwarded-For` from everyone who can reach the port, so anybody could fake HTTPS or the client IP. With it, only requests from the listed addresses may set them. Also restrict the port with a firewall to the proxy.
+
+Apply with `docker compose up -d`.
 
 ## Slow admin / timeouts to external servers (MTU)
 
@@ -82,7 +97,7 @@ docker compose down && docker compose up -d
 ## Security
 
 - The MariaDB root password is only given to the `db` container, not to WordPress, and root can only log in from inside that container.
-- MariaDB and Redis are not published on the host; WordPress is bound to `127.0.0.1`.
+- MariaDB and Redis are not published on the host; WordPress is bound to `127.0.0.1` unless `BIND_ADDRESS` says otherwise.
 - `DISALLOW_FILE_EDIT` disables the theme/plugin editor in the dashboard.
 - `.env`, `db/`, `redis/` and `wordpress_data/` are ignored by Git.
 

@@ -77,13 +77,25 @@ services:
       WORDPRESS_DB_USER: ${MYSQL_USER}
       WORDPRESS_DB_PASSWORD: ${MYSQL_PASSWORD}
       WORDPRESS_CONFIG_EXTRA: |
-        // Behind a reverse proxy on the host (port bound to 127.0.0.1 only).
-        if (($$_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https') {
-          $$_SERVER['HTTPS'] = 'on';
-        }
-        if (!empty($$_SERVER['HTTP_X_FORWARDED_FOR'])) {
-          $$_wp_xff = array_map('trim', explode(',', $$_SERVER['HTTP_X_FORWARDED_FOR']));
-          $$_SERVER['REMOTE_ADDR'] = end($$_wp_xff);
+        // Behind a reverse proxy. Headers are trusted from everyone by default,
+        // which is safe while the port is bound to 127.0.0.1 (BIND_ADDRESS).
+        // If the port is reachable from the network, set WP_TRUSTED_PROXIES to
+        // the proxy's IP(s) so nobody else can fake HTTPS or the client IP.
+        $$_wp_trusted = array_filter(array_map('trim', explode(',', '${WP_TRUSTED_PROXIES:-}')));
+        if (!$$_wp_trusted || in_array($$_SERVER['REMOTE_ADDR'] ?? '', $$_wp_trusted, true)) {
+          if (($$_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https') {
+            $$_SERVER['HTTPS'] = 'on';
+          }
+          if (!empty($$_SERVER['HTTP_X_FORWARDED_FOR'])) {
+            // The last entry is the one appended by our own proxy.
+            $$_wp_xff = array_map('trim', explode(',', $$_SERVER['HTTP_X_FORWARDED_FOR']));
+            $$_SERVER['REMOTE_ADDR'] = end($$_wp_xff);
+          }
+        } else {
+          // Not from a trusted proxy: undo what the official image's wp-config
+          // already derived from X-Forwarded-Proto (the container itself only
+          // speaks plain HTTP, so HTTPS can never be legitimately on here).
+          unset($$_SERVER['HTTPS'], $$_SERVER['HTTP_X_FORWARDED_PROTO'], $$_SERVER['HTTP_X_FORWARDED_FOR']);
         }
         define('DISALLOW_FILE_EDIT', true);
 
@@ -103,7 +115,8 @@ services:
       - ./wordpress_data:/var/www/html
       - ./wordpress.ini:/usr/local/etc/php/conf.d/wordpress.ini:ro
     ports:
-      - "127.0.0.1:${WEB_PORT:-3000}:80"
+      # 127.0.0.1 = only a reverse proxy on this host can reach the site (default)
+      - "${BIND_ADDRESS:-127.0.0.1}:${WEB_PORT:-3000}:80"
     healthcheck:
       # Exercises PHP and the database; redirects count as healthy.
       test: ["CMD-SHELL", "curl -fsS -o /dev/null -m 8 http://127.0.0.1/wp-login.php || exit 1"]
